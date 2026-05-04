@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: kendrick-shop
+    env: node
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: NODE_ENV
+        value: production
