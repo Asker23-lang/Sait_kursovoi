@@ -1,7 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const { getDatabase } = require('../database/init');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
+function getStripe() {
+  if (!process.env.STRIPE_SECRET_KEY) {
+    throw new Error('STRIPE_SECRET_KEY не задан');
+  }
+  return require('stripe')(process.env.STRIPE_SECRET_KEY);
+}
 
 // POST /api/orders — create a new order
 router.post('/', async (req, res) => {
@@ -96,7 +102,7 @@ router.post('/', async (req, res) => {
 
       let session;
       try {
-        session = await stripe.checkout.sessions.create({
+        session = await getStripe().checkout.sessions.create({
           payment_method_types: ['card'],
           line_items,
           mode: 'payment',
@@ -147,7 +153,7 @@ router.get('/verify-payment', async (req, res) => {
   if (!session_id) return res.status(400).json({ error: 'Не указан session_id' });
 
   try {
-    const session = await stripe.checkout.sessions.retrieve(session_id);
+    const session = await getStripe().checkout.sessions.retrieve(session_id);
 
     const db = getDatabase();
     try {
@@ -193,7 +199,7 @@ router.get('/resume-payment', async (req, res) => {
     if (order.status !== 'ожидает оплаты') return res.status(400).json({ error: 'Заказ не ожидает оплаты' });
     if (!order.stripe_session_id) return res.status(400).json({ error: 'Нет сессии оплаты' });
 
-    const session = await stripe.checkout.sessions.retrieve(order.stripe_session_id);
+    const session = await getStripe().checkout.sessions.retrieve(order.stripe_session_id);
     if (session.status === 'expired') {
       return res.status(410).json({ error: 'Сессия оплаты истекла. Оформите заказ заново.' });
     }
