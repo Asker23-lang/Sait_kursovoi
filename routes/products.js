@@ -29,4 +29,23 @@ router.get('/', (req, res) => {
   }
 });
 
+// GET /api/products/:id — get single product
+router.get('/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+  if (!id) return res.status(400).json({ error: 'Неверный ID' });
+
+  const db = getDatabase();
+  try {
+    const product = db.prepare('SELECT * FROM products WHERE id = ?').get(id);
+    if (!product) return res.status(404).json({ error: 'Товар не найден' });
+    res.json({
+      ...product,
+      sizes: JSON.parse(product.sizes),
+      tags: JSON.parse(product.tags),
+    });
+  } finally {
+    db.close();
+  }
+});
+
 module.exports = router;

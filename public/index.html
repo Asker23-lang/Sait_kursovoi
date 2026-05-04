@@ -32,6 +32,10 @@
           </svg>
           <span id="cart-count" class="cart-count hidden">0</span>
         </a>
+        <div id="user-menu" class="user-menu">
+          <a href="/login-user.html" class="auth-link">Войти</a>
+          <a href="/register.html" class="auth-link">Регистрация</a>
+        </div>
       </nav>
     </div>
   </header>
@@ -91,7 +95,17 @@
     </div>
   </div>
 
+  <!-- Product Modal -->
+  <div id="product-modal" class="modal hidden">
+    <div class="modal-content modal-product">
+      <button class="modal-close" id="product-modal-close">&times;</button>
+      <div id="product-details"></div>
+    </div>
+  </div>
+
+  <script src="/js/auth.js"></script>
   <script src="/js/main.js"></script>
+  <script src="/js/ai-chat.js"></script>
 </body>
 
 </html>

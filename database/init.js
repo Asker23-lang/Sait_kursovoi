@@ -70,6 +70,86 @@ function initDatabase() {
       image TEXT DEFAULT '',
       sort_order INTEGER DEFAULT 0
     );
+
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL UNIQUE,
+      password TEXT NOT NULL,
+      name TEXT DEFAULT '',
+      phone TEXT DEFAULT '',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      last_login DATETIME DEFAULT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS user_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      token TEXT NOT NULL UNIQUE,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      expires_at DATETIME NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS favorites (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      product_id INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+      UNIQUE(user_id, product_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS reviews (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      product_id INTEGER NOT NULL,
+      rating INTEGER NOT NULL CHECK(rating >= 1 AND rating <= 5),
+      title TEXT DEFAULT '',
+      comment TEXT NOT NULL,
+      is_moderated INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+      UNIQUE(user_id, product_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS user_carts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      product_id INTEGER NOT NULL,
+      size TEXT DEFAULT '',
+      quantity INTEGER NOT NULL DEFAULT 1,
+      price REAL NOT NULL,
+      product_name TEXT NOT NULL,
+      stock_quantity INTEGER DEFAULT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS user_addresses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      address TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE(user_id, address)
+    );
+
+    CREATE TABLE IF NOT EXISTS coupons (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      code TEXT NOT NULL UNIQUE,
+      discount_type TEXT NOT NULL CHECK(discount_type IN ('percent', 'fixed')),
+      discount_value REAL NOT NULL,
+      min_order_amount REAL DEFAULT 0,
+      max_discount REAL DEFAULT NULL,
+      usage_limit INTEGER DEFAULT NULL,
+      used_count INTEGER DEFAULT 0,
+      is_active INTEGER DEFAULT 1,
+      expires_at DATETIME DEFAULT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   // Add device_id column if missing
@@ -85,6 +165,27 @@ function initDatabase() {
   // Add stock_quantity column if missing (NULL = unlimited)
   try {
     db.exec('ALTER TABLE products ADD COLUMN stock_quantity INTEGER DEFAULT NULL');
+  } catch { /* column already exists */ }
+
+  // Add coupon and delivery fields to orders
+  try {
+    db.exec('ALTER TABLE orders ADD COLUMN coupon_code TEXT DEFAULT ""');
+  } catch { /* column already exists */ }
+
+  try {
+    db.exec('ALTER TABLE orders ADD COLUMN coupon_discount REAL DEFAULT 0');
+  } catch { /* column already exists */ }
+
+  try {
+    db.exec('ALTER TABLE orders ADD COLUMN delivery_cost REAL DEFAULT 0');
+  } catch { /* column already exists */ }
+
+  try {
+    db.exec('ALTER TABLE orders ADD COLUMN customer_email TEXT DEFAULT ""');
+  } catch { /* column already exists */ }
+
+  try {
+    db.exec('ALTER TABLE orders ADD COLUMN customer_comment TEXT DEFAULT ""');
   } catch { /* column already exists */ }
 
   // Insert demo products if table is empty

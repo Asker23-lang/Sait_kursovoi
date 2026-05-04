@@ -22,6 +22,10 @@
         <button class="nav-link tab-btn" data-tab="orders">Заказы</button>
         <button class="nav-link tab-btn" data-tab="stats">Статистика</button>
         <button class="nav-link tab-btn" data-tab="slider">Слайдер</button>
+        <button class="nav-link tab-btn" data-tab="database">База данных</button>
+        <button class="nav-link tab-btn" data-tab="reviews">Отзывы</button>
+        <button class="nav-link tab-btn" data-tab="import-export">Импорт/Экспорт</button>
+        <button class="nav-link tab-btn" data-tab="coupons">Купоны</button>
         <button class="nav-link" id="logout-btn" style="color:rgba(255,255,255,.4); margin-left:16px;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round">
@@ -254,6 +258,186 @@
       </div>
 
       <div id="slides-list" class="admin-table-wrap"></div>
+    </section>
+
+    <!-- ===== DATABASE TAB ===== -->
+    <section id="tab-database" class="admin-tab hidden">
+      <div class="admin-header">
+        <h1>База данных</h1>
+      </div>
+      <div id="database-tables" class="database-tables"></div>
+    </section>
+
+    <!-- ===== REVIEWS TAB ===== -->
+    <section id="tab-reviews" class="admin-tab hidden">
+      <div class="admin-header">
+        <h1>Отзывы</h1>
+      </div>
+      <div id="reviews-list" class="admin-table-wrap"></div>
+    </section>
+
+    <!-- ===== IMPORT/EXPORT TAB ===== -->
+    <section id="tab-import-export" class="admin-tab hidden">
+      <div class="admin-header">
+        <h1>Импорт/Экспорт товаров</h1>
+      </div>
+
+      <div class="import-export-grid">
+        <div class="import-export-card">
+          <h3>Экспорт товаров</h3>
+          <p>Скачайте все товары в формате CSV для резервного копирования или редактирования</p>
+          <button class="btn btn-primary" id="export-csv-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Экспортировать CSV
+          </button>
+        </div>
+
+        <div class="import-export-card">
+          <h3>Импорт товаров</h3>
+          <p>Загрузите товары из CSV файла. Существующие товары будут обновлены</p>
+          <div class="file-upload-area">
+            <input type="file" id="csv-file-input" accept=".csv" style="display: none;">
+            <button class="btn btn-outline" id="select-csv-btn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+              </svg>
+              Выбрать файл CSV
+            </button>
+            <div id="selected-file" class="selected-file hidden"></div>
+          </div>
+          <button class="btn btn-success" id="import-csv-btn" disabled>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            Импортировать
+          </button>
+        </div>
+      </div>
+
+      <div class="import-export-info">
+        <h3>Формат CSV файла</h3>
+        <p>CSV файл должен содержать следующие столбцы (в указанном порядке):</p>
+        <div class="csv-format">
+          <code>name,description,price,image,sizes,tags,stock_quantity,in_stock</code>
+        </div>
+        <div class="csv-examples">
+          <h4>Примеры:</h4>
+          <div class="csv-example">
+            <strong>Строка с одним размером:</strong><br>
+            <code>"Футболка Basic","Белая футболка из хлопка","2990","","[""M""]","[""Новинка""]","50","1"</code>
+          </div>
+          <div class="csv-example">
+            <strong>Строка с несколькими размерами:</strong><br>
+            <code>"Джинсы Slim","Темно-синие джинсы","15990","jeans.jpg","[""S"",""M"",""L"",""XL""]","[""Хит""]","25","1"</code>
+          </div>
+        </div>
+        <div class="csv-notes">
+          <p><strong>Важно:</strong></p>
+          <ul>
+            <li>Размеры и теги должны быть в формате JSON массива</li>
+            <li>Цена указывается в тенге без пробелов</li>
+            <li>Изображения должны быть предварительно загружены в папку uploads</li>
+            <li>Пустые значения можно оставлять пустыми (но не удалять столбцы)</li>
+          </ul>
+        </div>
+      </div>
+
+      <div id="import-results" class="import-results hidden">
+        <h3>Результаты импорта</h3>
+        <div id="import-stats"></div>
+        <div id="import-errors" class="import-errors hidden"></div>
+      </div>
+    </section>
+
+    <section id="tab-coupons" class="admin-tab hidden">
+      <div class="admin-header">
+        <h1>Купоны</h1>
+        <button class="btn btn-primary" id="add-coupon-btn">+ Добавить купон</button>
+      </div>
+
+      <div id="coupon-form-wrap" class="admin-form-wrap hidden">
+        <h2 id="coupon-form-title">Новый купон</h2>
+        <form id="coupon-form" class="admin-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="coupon-code">Код купона *</label>
+              <input type="text" id="coupon-code" name="code" required>
+            </div>
+            <div class="form-group">
+              <label for="coupon-type">Тип скидки *</label>
+              <select id="coupon-type" name="discount_type" required>
+                <option value="percent">Процент (%)</option>
+                <option value="fixed">Фиксированная сумма (₸)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="coupon-value">Значение скидки *</label>
+              <input type="number" id="coupon-value" name="discount_value" min="0" step="0.01" required>
+            </div>
+            <div class="form-group">
+              <label for="coupon-min-order">Мин. сумма заказа</label>
+              <input type="number" id="coupon-min-order" name="min_order_amount" min="0" step="0.01" placeholder="0">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="coupon-max-discount">Макс. скидка (₸)</label>
+              <input type="number" id="coupon-max-discount" name="max_discount" min="0" step="0.01" placeholder="Без ограничений">
+            </div>
+            <div class="form-group">
+              <label for="coupon-usage-limit">Лимит использований</label>
+              <input type="number" id="coupon-usage-limit" name="usage_limit" min="1" placeholder="Без ограничений">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="coupon-expires">Дата истечения</label>
+              <input type="datetime-local" id="coupon-expires" name="expires_at">
+            </div>
+            <div class="form-group">
+              <label for="coupon-active">Активен</label>
+              <input type="checkbox" id="coupon-active" name="is_active" checked>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Сохранить</button>
+            <button type="button" class="btn btn-secondary" id="cancel-coupon-btn">Отмена</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="admin-table-wrap">
+        <table class="admin-table" id="coupons-table">
+          <thead>
+            <tr>
+              <th>Код</th>
+              <th>Тип</th>
+              <th>Значение</th>
+              <th>Мин. заказ</th>
+              <th>Использований</th>
+              <th>Активен</th>
+              <th>Истекает</th>
+              <th>Действия</th>
+            </tr>
+          </thead>
+          <tbody id="coupons-tbody">
+            <!-- Coupons will be loaded here -->
+          </tbody>
+        </table>
+      </div>
     </section>
 
   </main>

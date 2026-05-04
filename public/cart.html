@@ -64,14 +64,36 @@
               <span>Товары (<span id="items-count">0</span>)</span>
               <span id="cart-subtotal">0 &#8381;</span>
             </div>
+
+            <!-- Купон -->
+            <div class="coupon-section">
+              <div class="coupon-input-group">
+                <input type="text" id="coupon-code" placeholder="Введите код купона" maxlength="20">
+                <button type="button" id="apply-coupon" class="btn btn-sm">Применить</button>
+              </div>
+              <div id="coupon-message" class="coupon-message hidden"></div>
+            </div>
+
+            <!-- Скидка от купона -->
+            <div class="summary-row coupon-discount hidden">
+              <span>Скидка по купону</span>
+              <span id="coupon-discount-amount">-0 &#8381;</span>
+            </div>
+
             <div class="summary-row">
               <span>Доставка</span>
-              <span class="delivery-free">Бесплатно</span>
+              <span id="delivery-cost">Расчет...</span>
             </div>
             <div class="summary-divider"></div>
             <div class="summary-row summary-total">
               <span>Итого</span>
               <span id="cart-total">0 &#8381;</span>
+            </div>
+
+            <!-- Сохранение корзины -->
+            <div class="cart-actions">
+              <button type="button" id="save-cart-btn" class="btn btn-outline">Сохранить корзину</button>
+              <button type="button" id="clear-cart-btn" class="btn btn-outline btn-danger">Очистить корзину</button>
             </div>
           </div>
 
@@ -80,16 +102,39 @@
             <form id="order-form">
               <div class="form-group">
                 <label for="name">Имя и фамилия</label>
-                <input type="text" id="name" name="customer_name" required placeholder="Ибрагим Казымов" maxlength="80">
+                <input type="text" id="name" name="customer_name" required placeholder="Serik Asker" maxlength="80">
               </div>
               <div class="form-group">
                 <label for="phone">Телефон</label>
                 <input type="tel" id="phone" name="customer_phone" required placeholder="+7 (775) 735-13-57" maxlength="20">
               </div>
               <div class="form-group">
-                <label for="address">Адрес доставки</label>
+                <label for="email">Email</label>
+                <input type="email" id="email" name="customer_email" placeholder="example@email.com" maxlength="100">
+              </div>
+
+              <!-- Сохраненные адреса -->
+              <div class="form-group">
+                <label>Адрес доставки</label>
+                <div id="saved-addresses" class="saved-addresses hidden">
+                  <select id="address-select" class="address-select">
+                    <option value="">Выберите сохраненный адрес</option>
+                  </select>
+                  <button type="button" id="new-address-btn" class="btn btn-sm btn-outline">Новый адрес</button>
+                </div>
                 <textarea id="address" name="customer_address" required
-                  placeholder="Город, улица, дом, квартира" maxlength="250"></textarea>
+                  placeholder="Город, улица, дом, квартира, подъезд, этаж" maxlength="250"></textarea>
+                <div class="address-actions">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="save-address"> Сохранить адрес для будущих заказов
+                  </label>
+                </div>
+              </div>
+
+              <!-- Комментарий к заказу -->
+              <div class="form-group">
+                <label for="comment">Комментарий к заказу</label>
+                <textarea id="comment" name="order_comment" placeholder="Особые пожелания по доставке или сборке" maxlength="500" rows="3"></textarea>
               </div>
 
               <div class="form-group">
@@ -142,7 +187,22 @@
     </div>
 
     <section id="my-orders" class="my-orders hidden">
-      <h2 class="page-title" style="font-size:1.4rem; margin-bottom:16px;">Мои заказы</h2>
+      <div class="orders-header">
+        <h2 class="page-title" style="font-size:1.4rem; margin-bottom:16px;">Мои заказы</h2>
+        <div class="orders-filters">
+          <select id="orders-filter" class="filter-select">
+            <option value="all">Все заказы</option>
+            <option value="pending">Ожидают оплаты</option>
+            <option value="paid">Оплаченные</option>
+            <option value="shipped">Отправленные</option>
+            <option value="delivered">Доставленные</option>
+            <option value="cancelled">Отмененные</option>
+          </select>
+          <input type="date" id="orders-date-from" class="filter-date" placeholder="Дата от">
+          <input type="date" id="orders-date-to" class="filter-date" placeholder="Дата до">
+          <button type="button" id="apply-filters" class="btn btn-sm">Применить</button>
+        </div>
+      </div>
       <div id="my-orders-list"></div>
     </section>
 
@@ -204,6 +264,7 @@
   </footer>
 
   <script src="/js/cart.js"></script>
+  <script src="/js/ai-chat.js"></script>
 </body>
 
 </html>

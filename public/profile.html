@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Профиль - KENDRICK</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+</head>
+
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <a href="/" class="logo">KENDRICK</a>
+      <nav class="nav">
+        <a href="/" class="nav-link">Каталог</a>
+        <a href="/favorites.html" class="nav-link fav-link">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
+          </svg>
+          <span id="fav-count" class="cart-count hidden">0</span>
+        </a>
+        <a href="/cart.html" class="nav-link cart-link">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <path d="M16 10a4 4 0 01-8 0" />
+          </svg>
+          <span id="cart-count" class="cart-count hidden">0</span>
+        </a>
+        <div id="user-menu" class="user-menu">
+          <a href="/login-user.html" class="auth-link">Войти</a>
+          <a href="/register.html" class="auth-link">Регистрация</a>
+        </div>
+      </nav>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="profile-container">
+      <div class="profile-header">
+        <h1>Мой профиль</h1>
+      </div>
+
+      <div class="profile-content">
+        <div class="profile-section">
+          <h2>Личные данные</h2>
+          <div id="profile-info" class="profile-info">
+            <div class="loading">Загрузка...</div>
+          </div>
+        </div>
+
+        <div class="profile-section">
+          <h2>Настройки</h2>
+          <div id="profile-edit" class="profile-edit hidden">
+            <form id="profile-form" class="profile-form">
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="edit-name">Имя</label>
+                  <input type="text" id="edit-name">
+                </div>
+                <div class="form-group">
+                  <label for="edit-phone">Телефон</label>
+                  <input type="tel" id="edit-phone">
+                </div>
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Сохранить</button>
+                <button type="button" class="btn btn-secondary" id="cancel-edit">Отмена</button>
+              </div>
+            </form>
+          </div>
+          <div class="profile-actions">
+            <button class="btn btn-outline" id="edit-profile-btn">Редактировать профиль</button>
+          </div>
+        </div>
+
+        <div class="profile-section">
+          <h2>Мои заказы</h2>
+          <div id="orders-list" class="orders-list">
+            <div class="loading">Загрузка заказов...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="/js/auth.js"></script>
+  <script src="/js/profile.js"></script>
+  <script src="/js/ai-chat.js"></script>
+</body>
+
+</html>

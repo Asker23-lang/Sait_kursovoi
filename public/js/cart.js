@@ -60,6 +60,7 @@ function saveCart(cart) {
   localStorage.setItem('cart', JSON.stringify(cart));
   updateCartCount();
   renderCart();
+  calculateDelivery();
 }
 function updateCartCount() {
   const cart = getCart();
@@ -68,6 +69,187 @@ function updateCartCount() {
     el.textContent = total;
     el.classList.toggle('hidden', total === 0);
   });
+}
+
+// ===== Coupon system =====
+let appliedCoupon = null;
+
+async function applyCoupon() {
+  const code = document.getElementById('coupon-code').value.trim().toUpperCase();
+  const messageEl = document.getElementById('coupon-message');
+
+  if (!code) {
+    messageEl.textContent = 'Введите код купона';
+    messageEl.className = 'coupon-message error';
+    messageEl.classList.remove('hidden');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/coupons/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    });
+
+    const result = await res.json();
+
+    if (result.valid) {
+      appliedCoupon = result.coupon;
+      messageEl.textContent = `Купон применен: ${result.coupon.description}`;
+      messageEl.className = 'coupon-message success';
+      renderCart();
+    } else {
+      appliedCoupon = null;
+      messageEl.textContent = result.error || 'Недействительный купон';
+      messageEl.className = 'coupon-message error';
+      renderCart();
+    }
+  } catch (err) {
+    messageEl.textContent = 'Ошибка проверки купона';
+    messageEl.className = 'coupon-message error';
+  }
+
+  messageEl.classList.remove('hidden');
+}
+
+function calculateDiscount(subtotal) {
+  if (!appliedCoupon) return 0;
+  if (appliedCoupon.min_order && subtotal < appliedCoupon.min_order) return 0;
+
+  if (appliedCoupon.type === 'percent') {
+    return Math.round(subtotal * appliedCoupon.value / 100);
+  } else if (appliedCoupon.type === 'fixed') {
+    return Math.min(appliedCoupon.value, subtotal);
+  }
+
+  return 0;
+}
+
+// ===== Delivery calculation =====
+async function calculateDelivery() {
+  const address = document.getElementById('address').value.trim();
+  const deliveryEl = document.getElementById('delivery-cost');
+
+  if (!address) {
+    deliveryEl.textContent = 'Введите адрес';
+    deliveryEl.className = '';
+    return;
+  }
+
+  // Simple delivery calculation based on city
+  const city = address.toLowerCase();
+  let cost = 0;
+
+  if (city.includes('алматы') || city.includes('астана') || city.includes('алма-ата')) {
+    cost = 0; // Free delivery in major cities
+  } else if (city.includes('шымкент') || city.includes('караганда') || city.includes('актобе')) {
+    cost = 1500; // Regional cities
+  } else {
+    cost = 2500; // Other locations
+  }
+
+  deliveryEl.textContent = cost === 0 ? 'Бесплатно' : formatPrice(cost);
+  deliveryEl.className = cost === 0 ? 'delivery-free' : '';
+
+  renderCart(); // Recalculate totals
+}
+
+// ===== Saved addresses =====
+async function loadSavedAddresses() {
+  const token = localStorage.getItem('user_token');
+  if (!token) return;
+
+  try {
+    const res = await window.userFetch('/api/users/addresses');
+    const addresses = await res.json();
+
+    if (addresses.length > 0) {
+      const container = document.getElementById('saved-addresses');
+      const select = document.getElementById('address-select');
+
+      container.classList.remove('hidden');
+      select.innerHTML = '<option value="">Выберите сохраненный адрес</option>' +
+        addresses.map(addr => `<option value="${esc(addr.address)}">${esc(addr.address)}</option>`).join('');
+
+      select.addEventListener('change', (e) => {
+        document.getElementById('address').value = e.target.value;
+        calculateDelivery();
+      });
+    }
+  } catch (err) {
+    console.error('Error loading addresses:', err);
+  }
+}
+
+async function saveAddress(address) {
+  const token = localStorage.getItem('user_token');
+  if (!token) return;
+
+  try {
+    await window.userFetch('/api/users/addresses', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address })
+    });
+  } catch (err) {
+    console.error('Error saving address:', err);
+  }
+}
+
+// ===== Cart persistence for logged users =====
+async function saveCartToServer() {
+  const token = localStorage.getItem('user_token');
+  if (!token) {
+    alert('Войдите в аккаунт, чтобы сохранить корзину');
+    return;
+  }
+
+  const cart = getCart();
+  if (cart.length === 0) {
+    alert('Корзина пуста');
+    return;
+  }
+
+  try {
+    await window.userFetch('/api/users/cart', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cart })
+    });
+    alert('Корзина сохранена!');
+  } catch (err) {
+    alert('Ошибка сохранения корзины');
+  }
+}
+
+async function loadCartFromServer() {
+  const token = localStorage.getItem('user_token');
+  if (!token) return;
+
+  try {
+    const res = await window.userFetch('/api/users/cart');
+    const data = await res.json();
+
+    if (data.cart && data.cart.length > 0) {
+      // Merge with local cart
+      const localCart = getCart();
+      const mergedCart = [...localCart];
+
+      for (const serverItem of data.cart) {
+        const existing = mergedCart.find(item =>
+          item.product_id === serverItem.product_id && item.size === serverItem.size
+        );
+        if (!existing) {
+          mergedCart.push(serverItem);
+        }
+      }
+
+      saveCart(mergedCart);
+    }
+  } catch (err) {
+    console.error('Error loading cart from server:', err);
+  }
 }
 
 function formatPrice(price) {
@@ -114,11 +296,26 @@ function renderCart() {
     </div>
   `).join('');
 
-  const totalCount = cart.reduce((s, i) => s + i.quantity, 0);
-  const total = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+  const subtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+  const discount = calculateDiscount(subtotal);
+  const deliveryText = document.getElementById('delivery-cost').textContent;
+  const deliveryCost = deliveryText === 'Бесплатно' || deliveryText === 'Введите адрес' ? 0 :
+                      parseInt(deliveryText.replace(/\D/g, '')) || 0;
+  const total = subtotal - discount + deliveryCost;
 
-  document.getElementById('items-count').textContent = totalCount;
-  document.getElementById('cart-subtotal').textContent = formatPrice(total);
+  document.getElementById('items-count').textContent = cart.reduce((s, i) => s + i.quantity, 0);
+  document.getElementById('cart-subtotal').textContent = formatPrice(subtotal);
+
+  // Show/hide coupon discount
+  const couponRow = document.querySelector('.coupon-discount');
+  const discountEl = document.getElementById('coupon-discount-amount');
+  if (discount > 0) {
+    couponRow.classList.remove('hidden');
+    discountEl.textContent = `-${formatPrice(discount)}`;
+  } else {
+    couponRow.classList.add('hidden');
+  }
+
   document.getElementById('cart-total').textContent = formatPrice(total);
   document.getElementById('btn-total').textContent = formatPrice(total);
 
@@ -161,7 +358,27 @@ document.getElementById('name').addEventListener('input', (e) => {
 document.getElementById('phone').addEventListener('input', (e) => {
   e.target.value = e.target.value.replace(/[^\d\+\(\)\-\s]/g, '');
 });
+// ===== Coupon events =====
+document.getElementById('apply-coupon').addEventListener('click', applyCoupon);
+document.getElementById('coupon-code').addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') applyCoupon();
+});
 
+// ===== Address events =====
+document.getElementById('address').addEventListener('input', calculateDelivery);
+document.getElementById('new-address-btn').addEventListener('click', () => {
+  document.getElementById('address-select').value = '';
+  document.getElementById('address').value = '';
+  document.getElementById('address').focus();
+});
+
+// ===== Cart actions =====
+document.getElementById('save-cart-btn').addEventListener('click', saveCartToServer);
+document.getElementById('clear-cart-btn').addEventListener('click', () => {
+  if (confirm('Очистить корзину?')) {
+    saveCart([]);
+  }
+});
 // ===== Payment method switching =====
 function updateSubmitButton() {
   const method = document.querySelector('input[name="payment_method"]:checked');
@@ -200,11 +417,21 @@ document.getElementById('order-form').addEventListener('submit', async (e) => {
   const data = {
     customer_name: form.customer_name.value.trim(),
     customer_phone: form.customer_phone.value.trim(),
+    customer_email: form.customer_email.value.trim(),
     customer_address: form.customer_address.value.trim(),
     payment_method: paymentMethod,
+    order_comment: form.order_comment.value.trim(),
     items: cart,
     device_id: getDeviceId(),
+    coupon_code: appliedCoupon ? appliedCoupon.code : null,
+    delivery_cost: document.getElementById('delivery-cost').textContent === 'Бесплатно' ? 0 :
+                  parseInt(document.getElementById('delivery-cost').textContent.replace(/\D/g, '')) || 0
   };
+
+  // Save address if requested
+  if (document.getElementById('save-address').checked && data.customer_address) {
+    await saveAddress(data.customer_address);
+  }
 
   const submitBtn = document.getElementById('submit-btn');
   submitBtn.disabled = true;
@@ -286,8 +513,19 @@ async function loadMyOrders() {
   if (!section || !list) return;
 
   const deviceId = getDeviceId();
+  const filter = document.getElementById('orders-filter').value;
+  const dateFrom = document.getElementById('orders-date-from').value;
+  const dateTo = document.getElementById('orders-date-to').value;
+
+  const params = new URLSearchParams({
+    device_id: deviceId,
+    status: filter,
+    date_from: dateFrom,
+    date_to: dateTo
+  });
+
   try {
-    const res = await fetch('/api/orders/my?device_id=' + encodeURIComponent(deviceId));
+    const res = await fetch('/api/orders/my?' + params);
     const data = await res.json();
     if (!data.success || !data.orders || data.orders.length === 0) {
       section.classList.add('hidden');
@@ -298,39 +536,116 @@ async function loadMyOrders() {
     list.innerHTML = data.orders.map(order => {
       const date = new Date(order.created_at + 'Z').toLocaleString('ru-RU', {
         timeZone: 'Asia/Almaty',
-        day: '2-digit', month: '2-digit', year: 'numeric',
-        hour: '2-digit', minute: '2-digit'
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
       });
-      const canCancel = order.status === 'новый' || order.status === 'ожидает оплаты';
+
+      const statusClass = getOrderStatusClass(order.status);
+      const statusText = getOrderStatusText(order.status);
+
       return `
-        <div class="my-order${order.status === 'отменён' ? ' cancelled' : ''}" data-id="${order.id}">
-          <div class="my-order-header">
+        <div class="order-card">
+          <div class="order-header">
             <div>
-              <span class="my-order-num">Заказ #${order.id}</span>
-              <span class="my-order-date">${date}</span>
+              <div class="order-num">Заказ #${order.id}</div>
+              <div class="order-date">${date}</div>
             </div>
-            <div class="my-order-right">
-              <span class="my-order-status">${order.status}</span>
-              <span class="my-order-total">${formatPrice(order.total)}</span>
-              <svg class="my-order-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-            </div>
+            <div class="order-status ${statusClass}">${statusText}</div>
           </div>
-          <div class="my-order-body">
-            ${order.items.map(i =>
-              `<div class="my-order-row">
-                <span>${esc(i.product_name)}${i.size ? ' (' + esc(i.size) + ')' : ''}</span>
-                <span>${i.quantity} × ${formatPrice(i.price)}</span>
-              </div>`
-            ).join('')}
-            ${order.status === 'ожидает оплаты' ? `<button class="my-order-pay" data-id="${order.id}">Продолжить оплату</button>` : ''}
-            ${canCancel ? `<button class="my-order-cancel" data-id="${order.id}">Отменить заказ</button>` : ''}
+
+          <div class="order-items">
+            ${order.items.map(item => `
+              <div class="order-item">
+                <span>${esc(item.product_name)} (${esc(item.size)}) × ${item.quantity}</span>
+                <span>${formatPrice(item.price * item.quantity)}</span>
+              </div>
+            `).join('')}
           </div>
-        </div>`;
+
+          <div class="order-total">
+            <strong>Итого: ${formatPrice(order.total)}</strong>
+          </div>
+
+          <div class="order-actions">
+            <button class="btn-reorder" onclick="reorder(${order.id})">Повторить заказ</button>
+            ${order.status === 'доставлен' ? `<button class="btn-rate" onclick="rateOrder(${order.id})">Оценить товары</button>` : ''}
+          </div>
+        </div>
+      `;
     }).join('');
-  } catch {
-    section.classList.add('hidden');
+  } catch (err) {
+    console.error('Error loading orders:', err);
+    list.innerHTML = '<p style="text-align:center;color:#888;">Ошибка загрузки заказов</p>';
   }
 }
+
+function getOrderStatusClass(status) {
+  const classes = {
+    'новый': 'status-pending',
+    'ожидает оплаты': 'status-pending',
+    'в обработке': 'status-processing',
+    'отправлен': 'status-shipped',
+    'доставлен': 'status-delivered',
+    'отменён': 'status-cancelled'
+  };
+  return classes[status] || 'status-pending';
+}
+
+function getOrderStatusText(status) {
+  const texts = {
+    'новый': 'Новый',
+    'ожидает оплаты': 'Ожидает оплаты',
+    'в обработке': 'В обработке',
+    'отправлен': 'Отправлен',
+    'доставлен': 'Доставлен',
+    'отменён': 'Отменён'
+  };
+  return texts[status] || status;
+}
+
+async function reorder(orderId) {
+  try {
+    const res = await fetch(`/api/orders/${orderId}/reorder`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      // Add items to cart
+      const currentCart = getCart();
+      const newCart = [...currentCart, ...data.items];
+      saveCart(newCart);
+      alert('Товары добавлены в корзину');
+      window.location.href = '/cart.html';
+    } else {
+      alert(data.error || 'Ошибка повторного заказа');
+    }
+  } catch (err) {
+    alert('Ошибка сети');
+  }
+}
+
+function rateOrder(orderId) {
+  // This would open a modal for rating products
+  alert('Функция оценки товаров будет добавлена в следующем обновлении');
+}
+
+// ===== Filters =====
+document.getElementById('apply-filters')?.addEventListener('click', loadMyOrders);
+document.getElementById('orders-filter')?.addEventListener('change', loadMyOrders);
+
+// ===== Init =====
+updateCartCount();
+updateFavCount();
+renderCart();
+loadSavedAddresses();
+loadCartFromServer();
+handleStripeReturn();
+loadMyOrders();
 
 // Toggle order details + cancel
 document.getElementById('my-orders-list')?.addEventListener('click', async (e) => {
@@ -380,9 +695,3 @@ document.getElementById('my-orders-list')?.addEventListener('click', async (e) =
   order.classList.toggle('open');
 });
 
-// Init
-updateCartCount();
-updateFavCount();
-handleStripeReturn();
-renderCart();
-loadMyOrders();

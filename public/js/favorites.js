@@ -1,3 +1,10 @@
+// XSS protection
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
 // ===== Cart helpers =====
 function getCart() {
   return JSON.parse(localStorage.getItem('cart') || '[]');
@@ -15,23 +22,49 @@ function updateCartCount() {
   });
 }
 
+// ===== Auth helper =====
+function authFetch(url, options = {}) {
+  const token = localStorage.getItem('user_token');
+  if (token) {
+    options.headers = options.headers || {};
+    options.headers['X-User-Token'] = token;
+  }
+  return fetch(url, options);
+}
+
 // ===== Favorites helpers =====
 function getFavorites() {
   return JSON.parse(localStorage.getItem('favorites') || '[]');
 }
-function updateFavCount() {
-  const count = getFavorites().length;
-  document.querySelectorAll('#fav-count').forEach(el => {
-    el.textContent = count;
-    el.classList.toggle('hidden', count === 0);
-  });
+async function updateFavCount() {
+  const token = localStorage.getItem('user_token');
+  if (token) {
+    try {
+      const res = await authFetch('/api/users/favorites');
+      const favs = await res.json();
+      const count = Array.isArray(favs) ? favs.length : 0;
+      document.querySelectorAll('#fav-count').forEach(el => {
+        el.textContent = count;
+        el.classList.toggle('hidden', count === 0);
+      });
+    } catch { /* ignore */ }
+  } else {
+    const count = getFavorites().length;
+    document.querySelectorAll('#fav-count').forEach(el => {
+      el.textContent = count;
+      el.classList.toggle('hidden', count === 0);
+    });
+  }
 }
-function removeFavorite(productId) {
-  let favs = getFavorites();
-  favs = favs.filter(id => id !== productId);
-  localStorage.setItem('favorites', JSON.stringify(favs));
-  updateFavCount();
-  return favs;
+async function removeFavorite(productId) {
+  const token = localStorage.getItem('user_token');
+  if (token) {
+    await authFetch(`/api/users/favorites/${productId}`, { method: 'POST' });
+  } else {
+    let favs = getFavorites();
+    favs = favs.filter(id => id !== productId);
+    localStorage.setItem('favorites', JSON.stringify(favs));
+  }
 }
 
 function formatPrice(price) {
@@ -49,23 +82,28 @@ function pluralize(n, one, few, many) {
 
 // ===== Load and render favorites =====
 async function loadFavorites() {
-  const favs = getFavorites();
   const emptyEl = document.getElementById('fav-empty');
   const grid = document.getElementById('fav-products');
   const countEl = document.getElementById('fav-page-count');
 
-  if (favs.length === 0) {
-    emptyEl.classList.remove('hidden');
-    grid.innerHTML = '';
-    countEl.textContent = '';
-    return;
+  let products = [];
+  const token = localStorage.getItem('user_token');
+
+  if (token) {
+    try {
+      const res = await authFetch('/api/users/favorites');
+      if (res.ok) products = await res.json();
+    } catch { /* ignore */ }
+  } else {
+    const favs = getFavorites();
+    if (favs.length > 0) {
+      try {
+        const res = await fetch('/api/products');
+        const all = await res.json();
+        products = all.filter(p => favs.includes(p.id));
+      } catch { /* ignore */ }
+    }
   }
-
-  emptyEl.classList.add('hidden');
-
-  const res = await fetch('/api/products');
-  const allProducts = await res.json();
-  const products = allProducts.filter(p => favs.includes(p.id));
 
   if (products.length === 0) {
     emptyEl.classList.remove('hidden');
@@ -74,6 +112,7 @@ async function loadFavorites() {
     return;
   }
 
+  emptyEl.classList.add('hidden');
   countEl.textContent = products.length + ' ' + pluralize(products.length, 'товар', 'товара', 'товаров');
 
   grid.innerHTML = products.map(product => {
@@ -91,17 +130,17 @@ async function loadFavorites() {
     return `
       <div class="product-card" data-id="${product.id}">
         <div class="product-image">
-          <img src="${imgSrc}" alt="${product.name}" loading="lazy">
+          <img src="${imgSrc}" alt="${esc(product.name)}" loading="lazy">
           ${tagsHtml ? `<div class="product-tags">${tagsHtml}</div>` : ''}
           <button class="btn-fav active" data-id="${product.id}" title="Убрать из избранного">&#9829;</button>
         </div>
         <div class="product-info">
-          <h3 class="product-name">${product.name}</h3>
-          ${product.description ? `<p class="product-desc">${product.description}</p>` : ''}
+          <h3 class="product-name">${esc(product.name)}</h3>
+          ${product.description ? `<p class="product-desc">${esc(product.description)}</p>` : ''}
           <div class="product-sizes">${sizesHtml}</div>
           <div class="product-bottom">
             <span class="product-price">${formatPrice(product.price)}</span>
-            <button class="btn btn-cart" data-id="${product.id}" data-name="${product.name}" data-price="${product.price}" data-sizes='${JSON.stringify(product.sizes)}'>
+            <button class="btn btn-cart" data-id="${product.id}" data-name="${esc(product.name)}" data-price="${product.price}" data-sizes='${JSON.stringify(product.sizes)}'>
               В корзину
             </button>
           </div>
@@ -110,12 +149,13 @@ async function loadFavorites() {
   }).join('');
 
   // Event listeners
-  grid.onclick = (e) => {
+  grid.onclick = async (e) => {
     const favBtn = e.target.closest('.btn-fav');
     if (favBtn) {
       const id = parseInt(favBtn.dataset.id);
-      removeFavorite(id);
-      loadFavorites();
+      await removeFavorite(id);
+      await loadFavorites();
+      updateFavCount();
       return;
     }
 

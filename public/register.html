@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Регистрация - KENDRICK</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+</head>
+
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <a href="/" class="logo">KENDRICK</a>
+      <nav class="nav">
+        <a href="/" class="nav-link">Каталог</a>
+        <a href="/favorites.html" class="nav-link fav-link">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
+          </svg>
+          <span id="fav-count" class="cart-count hidden">0</span>
+        </a>
+        <a href="/cart.html" class="nav-link cart-link">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <path d="M16 10a4 4 0 01-8 0" />
+          </svg>
+          <span id="cart-count" class="cart-count hidden">0</span>
+        </a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="auth-container">
+      <div class="auth-card">
+        <h1>Создать аккаунт</h1>
+
+        <div id="error-message" class="error-message hidden"></div>
+
+        <form id="register-form" class="auth-form">
+          <div class="form-group">
+            <label for="name">Имя</label>
+            <input type="text" id="name" placeholder="Ваше имя">
+          </div>
+
+          <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" required>
+          </div>
+
+          <div class="form-group">
+            <label for="phone">Телефон</label>
+            <input type="tel" id="phone" placeholder="+7 (___) ___-__-__">
+          </div>
+
+          <div class="form-group">
+            <label for="password">Пароль</label>
+            <input type="password" id="password" required minlength="6">
+          </div>
+
+          <div class="form-group">
+            <label for="password-confirm">Подтвердите пароль</label>
+            <input type="password" id="password-confirm" required minlength="6">
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-lg">Создать аккаунт</button>
+        </form>
+
+        <div class="auth-links">
+          <a href="/login-user.html">Уже есть аккаунт? Войти</a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="/js/auth.js"></script>
+</body>
+
+</html>

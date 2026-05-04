@@ -40,6 +40,8 @@ function requireAdmin(req, res, next) {
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/products', require('./routes/products'));
 app.use('/api/orders', require('./routes/orders'));
+app.use('/api/users', require('./routes/users'));
+app.use('/api/coupons', require('./routes/coupons'));
 app.use('/api/admin', requireAdmin, require('./routes/admin'));
 
 // Cleanup expired "ожидает оплаты" orders (older than 24h)

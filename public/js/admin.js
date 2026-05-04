@@ -738,8 +738,479 @@ slideForm.addEventListener('submit', async (e) => {
   }
 });
 
+// ===== DATABASE =====
+async function loadDatabaseTables() {
+  const container = document.getElementById('database-tables');
+  container.innerHTML = '<div class="loading">Загрузка...</div>';
+
+  try {
+    const res = await adminFetch('/api/admin/database/tables');
+    const tables = await res.json();
+
+    container.innerHTML = '';
+
+    for (const [tableName, rows] of Object.entries(tables)) {
+      const tableSection = document.createElement('div');
+      tableSection.className = 'database-table-section';
+
+      const tableHeader = document.createElement('h3');
+      tableHeader.textContent = tableName;
+      tableSection.appendChild(tableHeader);
+
+      if (rows.error) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'database-error';
+        errorDiv.textContent = `Ошибка: ${rows.error}`;
+        tableSection.appendChild(errorDiv);
+      } else if (!rows || rows.length === 0) {
+        const emptyDiv = document.createElement('div');
+        emptyDiv.className = 'database-empty';
+        emptyDiv.textContent = 'Нет данных';
+        tableSection.appendChild(emptyDiv);
+      } else {
+        const table = document.createElement('table');
+        table.className = 'database-table';
+
+        // Create header row
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        Object.keys(rows[0]).forEach(col => {
+          const th = document.createElement('th');
+          th.textContent = col;
+          headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        // Create data rows
+        const tbody = document.createElement('tbody');
+        rows.forEach(row => {
+          const tr = document.createElement('tr');
+          Object.values(row).forEach(value => {
+            const td = document.createElement('td');
+            // Handle different data types
+            if (value === null) {
+              td.textContent = 'NULL';
+              td.className = 'null-value';
+            } else if (typeof value === 'boolean') {
+              td.textContent = value ? 'true' : 'false';
+            } else if (typeof value === 'object') {
+              td.textContent = JSON.stringify(value);
+              td.className = 'json-value';
+            } else {
+              td.textContent = String(value);
+            }
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+
+        tableSection.appendChild(table);
+      }
+
+      container.appendChild(tableSection);
+    }
+  } catch (err) {
+    container.innerHTML = '<div class="database-error">Ошибка загрузки данных</div>';
+    console.error('Database load error:', err);
+  }
+}
+
+// ===== REVIEWS =====
+async function loadReviews() {
+  const container = document.getElementById('reviews-list');
+  container.innerHTML = '<div class="loading">Загрузка отзывов...</div>';
+
+  try {
+    const res = await adminFetch('/api/admin/reviews');
+    const reviews = await res.json();
+
+    if (reviews.length === 0) {
+      container.innerHTML = '<p style="text-align: center; padding: 2rem; color: #666;">Отзывов пока нет</p>';
+      return;
+    }
+
+    const html = `
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Пользователь</th>
+            <th>Товар</th>
+            <th>Рейтинг</th>
+            <th>Заголовок</th>
+            <th>Отзыв</th>
+            <th>Дата</th>
+            <th>Статус</th>
+            <th>Действия</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${reviews.map(review => `
+            <tr>
+              <td>${review.id}</td>
+              <td>${esc(review.user_name)}<br><small style="color:#666">${esc(review.user_email)}</small></td>
+              <td>${esc(review.product_name)}</td>
+              <td>
+                <div class="rating-stars">
+                  ${'★'.repeat(review.rating)}${'☆'.repeat(5 - review.rating)}
+                </div>
+                <span style="font-size:0.9rem;color:#666">${review.rating}/5</span>
+              </td>
+              <td>${esc(review.title)}</td>
+              <td style="max-width:300px;word-wrap:break-word">${esc(review.comment)}</td>
+              <td>${new Date(review.created_at).toLocaleDateString('ru-RU')}</td>
+              <td>
+                <span class="status-badge ${review.is_moderated ? 'status-approved' : 'status-pending'}">
+                  ${review.is_moderated ? 'Одобрен' : 'На модерации'}
+                </span>
+              </td>
+              <td>
+                ${!review.is_moderated ? `
+                  <button class="btn btn-sm btn-success" onclick="moderateReview(${review.id}, true)">Одобрить</button>
+                  <button class="btn btn-sm btn-danger" onclick="moderateReview(${review.id}, false)">Отклонить</button>
+                ` : `
+                  <button class="btn btn-sm btn-danger" onclick="deleteReview(${review.id})">Удалить</button>
+                `}
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+
+    container.innerHTML = html;
+  } catch (err) {
+    container.innerHTML = '<div class="error">Ошибка загрузки отзывов</div>';
+    console.error('Reviews load error:', err);
+  }
+}
+
+async function moderateReview(reviewId, approved) {
+  if (!confirm(approved ? 'Одобрить этот отзыв?' : 'Отклонить этот отзыв?')) return;
+
+  try {
+    const res = await adminFetch(`/api/admin/reviews/${reviewId}/moderate`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ approved })
+    });
+
+    if (res.ok) {
+      loadReviews();
+    } else {
+      alert('Ошибка модерации отзыва');
+    }
+  } catch (err) {
+    alert('Ошибка сети');
+    console.error('Moderate review error:', err);
+  }
+}
+
+async function deleteReview(reviewId) {
+  if (!confirm('Удалить этот отзыв?')) return;
+
+  try {
+    const res = await adminFetch(`/api/admin/reviews/${reviewId}`, {
+      method: 'DELETE'
+    });
+
+    if (res.ok) {
+      loadReviews();
+    } else {
+      alert('Ошибка удаления отзыва');
+    }
+  } catch (err) {
+    alert('Ошибка сети');
+    console.error('Delete review error:', err);
+  }
+}
+
 // Init — load all
 loadProducts();
 loadOrders();
 loadStats();
 loadSlides();
+loadDatabaseTables();
+loadReviews();
+
+// ===== CSV Import/Export =====
+document.getElementById('export-csv-btn').addEventListener('click', exportProductsToCSV);
+
+document.getElementById('select-csv-btn').addEventListener('click', () => {
+  document.getElementById('csv-file-input').click();
+});
+
+document.getElementById('csv-file-input').addEventListener('change', handleFileSelect);
+document.getElementById('import-csv-btn').addEventListener('click', importProductsFromCSV);
+
+async function exportProductsToCSV() {
+  try {
+    const res = await adminFetch('/api/admin/products/export');
+    if (!res.ok) throw new Error('Export failed');
+
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `products_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    alert('Ошибка экспорта: ' + err.message);
+  }
+}
+
+function handleFileSelect(e) {
+  const file = e.target.files[0];
+  const selectedFileEl = document.getElementById('selected-file');
+  const importBtn = document.getElementById('import-csv-btn');
+
+  if (file) {
+    selectedFileEl.textContent = `Выбран файл: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+    selectedFileEl.classList.remove('hidden');
+    importBtn.disabled = false;
+  } else {
+    selectedFileEl.classList.add('hidden');
+    importBtn.disabled = true;
+  }
+}
+
+async function importProductsFromCSV() {
+  const fileInput = document.getElementById('csv-file-input');
+  const file = fileInput.files[0];
+
+  if (!file) {
+    alert('Выберите файл для импорта');
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('csv', file);
+
+  const importBtn = document.getElementById('import-csv-btn');
+  const originalText = importBtn.textContent;
+  importBtn.disabled = true;
+  importBtn.textContent = 'Импорт...';
+
+  try {
+    const res = await adminFetch('/api/admin/products/import', {
+      method: 'POST',
+      body: formData
+    });
+
+    const result = await res.json();
+
+    if (result.success) {
+      showImportResults(result);
+      loadProducts(); // Refresh products list
+    } else {
+      alert('Ошибка импорта: ' + (result.error || 'Неизвестная ошибка'));
+    }
+  } catch (err) {
+    alert('Ошибка импорта: ' + err.message);
+  } finally {
+    importBtn.disabled = false;
+    importBtn.textContent = originalText;
+    fileInput.value = '';
+    document.getElementById('selected-file').classList.add('hidden');
+  }
+}
+
+function showImportResults(result) {
+  const resultsEl = document.getElementById('import-results');
+  const statsEl = document.getElementById('import-stats');
+  const errorsEl = document.getElementById('import-errors');
+
+  // Show stats
+  statsEl.innerHTML = `
+    <div class="import-stat">
+      <span class="stat-number">${result.stats.total}</span>
+      <span class="stat-label">Всего строк</span>
+    </div>
+    <div class="import-stat">
+      <span class="stat-number">${result.stats.created}</span>
+      <span class="stat-label">Создано</span>
+    </div>
+    <div class="import-stat">
+      <span class="stat-number">${result.stats.updated}</span>
+      <span class="stat-label">Обновлено</span>
+    </div>
+    <div class="import-stat">
+      <span class="stat-number">${result.stats.errors}</span>
+      <span class="stat-label">Ошибок</span>
+    </div>
+  `;
+
+  // Show errors if any
+  if (result.errors && result.errors.length > 0) {
+    errorsEl.innerHTML = result.errors.map(error =>
+      `<div class="import-error">Строка ${error.row}: ${esc(error.message)}</div>`
+    ).join('');
+    errorsEl.classList.remove('hidden');
+  } else {
+    errorsEl.classList.add('hidden');
+  }
+
+  resultsEl.classList.remove('hidden');
+  resultsEl.scrollIntoView({ behavior: 'smooth' });
+}
+
+// ===== Coupons Management =====
+
+let currentCouponId = null;
+
+function loadCoupons() {
+  adminFetch('/api/admin/coupons')
+    .then(r => r.json())
+    .then(coupons => {
+      const tbody = document.getElementById('coupons-tbody');
+      tbody.innerHTML = coupons.map(coupon => `
+        <tr>
+          <td>${esc(coupon.code)}</td>
+          <td>${coupon.discount_type === 'percent' ? 'Процент' : 'Фиксированная сумма'}</td>
+          <td class="${coupon.discount_type === 'percent' ? 'discount-percent' : 'discount-fixed'}">${coupon.discount_value}</td>
+          <td>${coupon.min_order_amount > 0 ? coupon.min_order_amount + ' ₸' : 'Нет'}</td>
+          <td>${coupon.usage_limit ? coupon.usage_limit : 'Без ограничений'}</td>
+          <td class="${coupon.is_active ? 'status-active' : 'status-inactive'}">${coupon.is_active ? 'Активен' : 'Неактивен'}</td>
+          <td>${coupon.expires_at ? new Date(coupon.expires_at).toLocaleDateString('ru-RU') : 'Бессрочно'}</td>
+          <td class="actions-cell">
+            <button class="btn btn-sm btn-edit" onclick="editCoupon(${coupon.id})">Изменить</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteCoupon(${coupon.id}, '${esc(coupon.code)}')">Удалить</button>
+          </td>
+        </tr>
+      `).join('');
+    })
+    .catch(err => console.error('Error loading coupons:', err));
+}
+
+function showCouponForm(coupon = null) {
+  const formWrap = document.getElementById('coupon-form-wrap');
+  const formTitle = document.getElementById('coupon-form-title');
+  const form = document.getElementById('coupon-form');
+
+  if (coupon) {
+    formTitle.textContent = 'Изменить купон';
+    form.elements.code.value = coupon.code;
+    form.elements.discount_type.value = coupon.discount_type;
+    form.elements.discount_value.value = coupon.discount_value;
+    form.elements.min_order_amount.value = coupon.min_order_amount || '';
+    form.elements.max_discount.value = coupon.max_discount || '';
+    form.elements.usage_limit.value = coupon.usage_limit || '';
+    form.elements.is_active.checked = coupon.is_active;
+    form.elements.expires_at.value = coupon.expires_at ? new Date(coupon.expires_at).toISOString().slice(0, 16) : '';
+    currentCouponId = coupon.id;
+  } else {
+    formTitle.textContent = 'Новый купон';
+    form.reset();
+    currentCouponId = null;
+  }
+
+  formWrap.classList.remove('hidden');
+  form.elements.code.focus();
+}
+
+function hideCouponForm() {
+  document.getElementById('coupon-form-wrap').classList.add('hidden');
+  currentCouponId = null;
+}
+
+function saveCoupon(event) {
+  event.preventDefault();
+
+  const form = event.target;
+  const formData = new FormData(form);
+
+  const couponData = {
+    code: formData.get('code').trim(),
+    discount_type: formData.get('discount_type'),
+    discount_value: parseFloat(formData.get('discount_value')),
+    min_order_amount: formData.get('min_order_amount') ? parseFloat(formData.get('min_order_amount')) : 0,
+    max_discount: formData.get('max_discount') ? parseFloat(formData.get('max_discount')) : null,
+    usage_limit: formData.get('usage_limit') ? parseInt(formData.get('usage_limit')) : null,
+    is_active: formData.has('is_active'),
+    expires_at: formData.get('expires_at') || null
+  };
+
+  const url = currentCouponId ? `/api/admin/coupons/${currentCouponId}` : '/api/admin/coupons';
+  const method = currentCouponId ? 'PUT' : 'POST';
+
+  adminFetch(url, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(couponData)
+  })
+  .then(r => r.json())
+  .then(result => {
+    if (result.success) {
+      hideCouponForm();
+      loadCoupons();
+    } else {
+      alert('Ошибка: ' + result.error);
+    }
+  })
+  .catch(err => {
+    console.error('Error saving coupon:', err);
+    alert('Ошибка при сохранении купона');
+  });
+}
+
+function editCoupon(id) {
+  adminFetch(`/api/admin/coupons`)
+    .then(r => r.json())
+    .then(coupons => {
+      const coupon = coupons.find(c => c.id === id);
+      if (coupon) {
+        showCouponForm(coupon);
+      }
+    })
+    .catch(err => console.error('Error loading coupon:', err));
+}
+
+function deleteCoupon(id, code) {
+  if (!confirm(`Удалить купон "${code}"?`)) return;
+
+  adminFetch(`/api/admin/coupons/${id}`, { method: 'DELETE' })
+    .then(r => r.json())
+    .then(result => {
+      if (result.success) {
+        loadCoupons();
+      } else {
+        alert('Ошибка: ' + result.error);
+      }
+    })
+    .catch(err => {
+      console.error('Error deleting coupon:', err);
+      alert('Ошибка при удалении купона');
+    });
+}
+
+// ===== Event Listeners =====
+
+// Tab switching
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.admin-tab').forEach(tab => tab.classList.add('hidden'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.remove('hidden');
+
+    // Load data for specific tabs
+    if (btn.dataset.tab === 'coupons') {
+      loadCoupons();
+    }
+  });
+});
+
+// Coupon form
+document.getElementById('add-coupon-btn').addEventListener('click', () => showCouponForm());
+document.getElementById('cancel-coupon-btn').addEventListener('click', hideCouponForm);
+document.getElementById('coupon-form').addEventListener('submit', saveCoupon);
+
+// Load initial data
+loadProducts();
+loadOrders();
+loadStats();
